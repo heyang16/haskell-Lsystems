@@ -83,8 +83,9 @@ expand s n r = expand s0 (n - 1) r
 -- 'R': rotates a degrees clockwise
 -- 'L': rotates a degrees anticlockwise
 -- after rotation, final angle lies between -180 and 180
+-- As facing -180 degrees is the same as facing 180 degrees, we set 180 degrees to be the standard
 move :: Command -> Angle -> TurtleState -> TurtleState
-move 'F' a ((x, y), t) = ((x + cos (pi * t / 180), y + sin (pi * t / 180)), t)
+move 'F' a ((x, y), t) = ((x + cos ((pi / 180) * t), y + sin ((pi / 180) * t)), t)
 move 'R' a (p, t) = (p, if r == -180 then 180 else r)
   where
     r = mod' (t - a + 180) 360 - 180
@@ -97,18 +98,45 @@ move 'L' a (p, t) = (p, if l == -180 then 180 else l)
 --
 
 trace1 :: Commands -> Angle -> Colour -> [ColouredLine]
-trace1 "" a clr = []
-trace1 [c] a clr = undefined
-trace1 (c:cs) a clr
-  | c == '[' = (, ,clr): trace1 cs a clr
-  | c == ']' = undefined : trace1 cs a clr
-  | otherwise = undefined : trace1 cs a clr
+trace1 cs a clr = fst (h1 ((0.0, 0.0), 90.0) cs)
   where
-    
+    h1 :: TurtleState -> Commands -> ([ColouredLine], Commands)
+    h1 _ [] = ([], [])
+    h1 ts (c:cs)
+      | c == ']' = ([], cs)
+      | c == '[' = (intraces ++ outtraces, ununproc) -- processes commands in and out of the bracket, appending them together
+      -- Normal commands
+      | c == 'L' || c == 'R' = t 
+      | c == 'F' = ((v1, v2, clr) : traces, csleft)
+      where
+        ts' = move c a ts
+        (v1, _) = ts
+        (v2, _) = ts'
+        t@(traces, csleft) = h1 ts' cs 
+        (intraces, unproc) =  h1 ts cs
+        (outtraces, ununproc) = h1 ts unproc
 
 trace2 :: Commands -> Angle -> Colour -> [ColouredLine]
-trace2
-  |
+trace2 = h2 [] ((0.0, 0.0), 90.0)
+  where
+    -- Helper function for trace2
+    -- Has 2 extra arguments: stack which helps store turtle states when entering a branch
+    -- and ts which is the current turtle state
+    h2 :: Stack -> TurtleState -> Commands -> Angle -> Colour -> [ColouredLine]
+    h2 _ _ [] _ _ = []
+    h2 stack ts (c:cs) a clr 
+      | c == '[' = h2 (ts : stack) ts cs a clr -- adds current turtle state to top of stack
+      | c == ']' = h2 stacktail top cs a clr -- fetches turtle state from top of stack and removing it
+      -- Normal commands
+      | c == 'L' || c == 'R' = traces
+      | c == 'F' = (v1, v2, clr) : traces -- Only add a line when the turtle moves forward
+      where
+        ts' = move c a ts -- new turtle state
+        (top : stacktail) = stack
+        (v1, _) = ts
+        (v2, _) = ts'
+        traces = h2 stack ts' cs a clr
+
 
 ----------------------------------------------------------
 -- Some given functions
