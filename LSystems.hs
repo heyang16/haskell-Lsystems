@@ -78,14 +78,19 @@ expand s 1 r = expandOne s r
 expand s n r = expand s0 (n - 1) r
   where s0 = expandOne s r
 
+toRad :: Float -> Float
+toRad a
+  = pi * (a / 180)
+
 -- Move a turtle
 -- 'F': moves forward by 1 unit in the direction currently facing
 -- 'R': rotates a degrees clockwise
 -- 'L': rotates a degrees anticlockwise
 -- after rotation, final angle lies between -180 and 180
--- As facing -180 degrees is the same as facing 180 degrees, we set 180 degrees to be the standard
+-- As facing -180 degrees is the same as facing 180 degrees, we set 180 degrees
+-- to be the standard
 move :: Command -> Angle -> TurtleState -> TurtleState
-move 'F' a ((x, y), t) = ((x + cos ((pi / 180) * t), y + sin ((pi / 180) * t)), t)
+move 'F' a ((x, y), t) = ((x + cos (toRad t), y + sin (toRad t)), t)
 move 'R' a (p, t) = (p, if r == -180 then 180 else r)
   where
     r = mod' (t - a + 180) 360 - 180
@@ -104,7 +109,8 @@ trace1 cs a clr = fst (h1 ((0.0, 0.0), 90.0) cs)
     h1 _ [] = ([], [])
     h1 ts (c:cs)
       | c == ']' = ([], cs)
-      | c == '[' = (intraces ++ outtraces, ununproc) -- processes commands in and out of the bracket, appending them together
+      -- processes commands in and out of the bracket, appending them together
+      | c == '[' = (intraces ++ outtraces, ununproc)
       -- Normal commands
       | c == 'L' || c == 'R' = t 
       | c == 'F' = ((v1, v2, clr) : traces, csleft)
@@ -117,25 +123,28 @@ trace1 cs a clr = fst (h1 ((0.0, 0.0), 90.0) cs)
         (outtraces, ununproc) = h1 ts unproc
 
 trace2 :: Commands -> Angle -> Colour -> [ColouredLine]
-trace2 = h2 [] ((0.0, 0.0), 90.0)
+trace2 cs a clr = h2 [] ((0.0, 0.0), 90.0) cs
   where
     -- Helper function for trace2
-    -- Has 2 extra arguments: stack which helps store turtle states when entering a branch
-    -- and ts which is the current turtle state
-    h2 :: Stack -> TurtleState -> Commands -> Angle -> Colour -> [ColouredLine]
-    h2 _ _ [] _ _ = []
-    h2 stack ts (c:cs) a clr 
-      | c == '[' = h2 (ts : stack) ts cs a clr -- adds current turtle state to top of stack
-      | c == ']' = h2 stacktail top cs a clr -- fetches turtle state from top of stack and removing it
+    -- Has 2 extra arguments: stack which helps store turtle states when 
+    -- entering a branch and ts which is the current turtle state
+    h2 :: Stack -> TurtleState -> Commands -> [ColouredLine]
+    h2 _ _ [] = []
+    h2 stack ts (c:cs)
+      -- adds current turtle state to top of stack
+      | c == '[' = h2 (ts : stack) ts cs 
+      -- fetches turtle state from top of stack and removing it
+      | c == ']' = h2 stacktail top cs 
       -- Normal commands
       | c == 'L' || c == 'R' = traces
-      | c == 'F' = (v1, v2, clr) : traces -- Only add a line when the turtle moves forward
+      -- Only add a line when the turtle moves forward
+      | c == 'F' = (v1, v2, clr) : traces
       where
         ts' = move c a ts -- new turtle state
         (top : stacktail) = stack
         (v1, _) = ts
         (v2, _) = ts'
-        traces = h2 stack ts' cs a clr
+        traces = h2 stack ts' cs 
 
 
 ----------------------------------------------------------
